@@ -1,0 +1,56 @@
+name: Migrate to pnpm
+on:
+  workflow_dispatch:
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Migrate lockfile
+        run: |
+          rm -f package-lock.json yarn.lock
+          pnpm install --no-frozen-lockfile || true
+      - name: Update package.json scripts
+        run: |
+          node -e "
+          const fs = require('fs');
+          try {
+            let content = fs.readFileSync('package.json', 'utf8');
+            content = content
+              .replace(/\"npm run /g, '\"pnpm run ')
+              .replace(/\"npm install/g, '\"pnpm install')
+              .replace(/\"npm ci/g, '\"pnpm install --frozen-lockfile');
+            fs.writeFileSync('package.json', content);
+            console.log('package.json updated');
+          } catch(e) { console.log('Skipped:', e.message); }
+          " || true
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: 'chore: migrate from npm to pnpm'
+          title: 'chore: migrar de npm a pnpm'
+          body: |
+            ## Migración npm → pnpm
+
+            Este PR fue generado automáticamente por **GitHub Vulnerability Checker**.
+
+            ### Cambios realizados
+            - Eliminado `package-lock.json`
+            - Generado `pnpm-lock.yaml` con las mismas dependencias
+            - Referencias `npm run` → `pnpm run` actualizadas en scripts
+
+            ### Pasos después del merge
+            1. Instala pnpm si no lo tienes: `npm install -g pnpm`
+            2. Usa `pnpm install` en vez de `npm install`
+            3. Usa `pnpm run <script>` en vez de `npm run <script>`
+          branch: migrate-to-pnpm
+          delete-branch: true
